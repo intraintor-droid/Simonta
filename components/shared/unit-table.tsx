@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Plus, Pencil, Power } from "lucide-react";
+import { Plus, Pencil, Power, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,7 +20,13 @@ import {
 import { EmptyState } from "@/components/ui/empty-state";
 import { Building2 } from "lucide-react";
 import { unitFormSchema, type UnitFormValues } from "@/lib/validations/master";
-import { createUnit, updateUnit, toggleUnitActive } from "@/app/(app)/master/unit/actions";
+import {
+  createUnit,
+  updateUnit,
+  toggleUnitActive,
+  deleteUnit,
+  getUnitUsageCount,
+} from "@/app/(app)/master/unit/actions";
 import type { Unit } from "@/types";
 
 export function UnitTable({
@@ -85,6 +91,28 @@ export function UnitTable({
     }
   }
 
+  async function onDelete(unit: Unit) {
+    try {
+      const usage = await getUnitUsageCount(unit.id);
+      const parts: string[] = [];
+      if (usage.workCount > 0) parts.push(`${usage.workCount} pekerjaan`);
+      if (usage.userCount > 0) parts.push(`${usage.userCount} user`);
+      const warning =
+        parts.length > 0
+          ? `Unit ini masih dipakai oleh ${parts.join(" dan ")}. Data tersebut TIDAK akan ikut terhapus, tapi kolom unit-nya akan menjadi kosong. `
+          : "";
+      const confirmed = confirm(
+        `${warning}Hapus unit "${unit.name}" secara permanen? Tindakan ini tidak dapat dibatalkan.\n\nJika ragu, gunakan tombol nonaktifkan (ikon daya) saja.`
+      );
+      if (!confirmed) return;
+      await deleteUnit(unit.id);
+      setUnits((prev) => prev.filter((u) => u.id !== unit.id));
+      toast.success("Unit berhasil dihapus");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Gagal menghapus unit");
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4">
       {canManage && (
@@ -126,8 +154,17 @@ export function UnitTable({
                         <Button variant="ghost" size="icon" onClick={() => openEdit(u)}>
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => onToggle(u)}>
+                        <Button variant="ghost" size="icon" onClick={() => onToggle(u)} title="Aktifkan/Nonaktifkan">
                           <Power className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => onDelete(u)}
+                          title="Hapus permanen"
+                          className="text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </td>

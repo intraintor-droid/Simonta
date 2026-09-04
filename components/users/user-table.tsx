@@ -19,10 +19,23 @@ import {
 } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { userFormSchema, type UserFormValues } from "@/lib/validations/master";
+import { z } from "zod";
 import { createUser, updateUser, setUserActive, type CreateUserValues } from "@/app/(app)/users/actions";
 import type { Profile } from "@/types";
 
 type ProfileWithUnit = Profile & { unit: { id: string; name: string } | null };
+
+// PENTING: `userFormSchema` (dipakai untuk update) tidak memiliki field `password`.
+// Zod object secara default MEMBUANG (strip) field yang tidak dikenal saat parsing,
+// jadi kalau form ini memakai `zodResolver(userFormSchema)` langsung, nilai password
+// yang diketik user akan selalu hilang sebelum sampai ke onSubmit — walau sudah diisi
+// benar, validasi manual di bawah akan selalu gagal karena `values.password` undefined.
+// Perbaikan: pakai schema turunan yang tetap menyertakan `password` (opsional) supaya
+// nilainya tidak ikut terbuang saat parsing, validasi panjang minimal tetap dilakukan
+// manual di `onSubmit` (hanya wajib saat membuat user baru).
+const userDialogSchema = userFormSchema.extend({
+  password: z.string().optional(),
+});
 
 const ROLE_VARIANT: Record<string, "destructive" | "info" | "secondary"> = {
   SUPERADMIN: "destructive",
@@ -46,7 +59,7 @@ export function UserTable({
   const [q, setQ] = useState(searchParams.get("q") ?? "");
 
   const form = useForm<UserFormValues & { password?: string }>({
-    resolver: zodResolver(userFormSchema),
+    resolver: zodResolver(userDialogSchema),
     defaultValues: {
       email: "",
       full_name: "",
@@ -260,7 +273,7 @@ export function UserTable({
               <Input id="position" {...form.register("position")} />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="unit_id">Unit</Label>
+              <Label htmlFor="unit_id">Unit (Opsional)</Label>
               <select
                 id="unit_id"
                 className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm dark:border-slate-700 dark:bg-slate-900"

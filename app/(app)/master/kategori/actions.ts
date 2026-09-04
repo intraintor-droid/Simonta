@@ -77,3 +77,42 @@ export async function toggleCategoryActive(id: string, isActive: boolean) {
 
   revalidatePath("/master/kategori");
 }
+
+/**
+ * Hard delete kategori. `works.category_id` memakai `on delete set null`, jadi
+ * secara teknis aman — SUPERADMIN akan diberi tahu berapa pekerjaan yang memakai
+ * kategori ini sebelum konfirmasi hapus.
+ */
+export async function deleteCategory(id: string) {
+  const profile = await requireRole(["SUPERADMIN"]);
+  const supabase = await createClient();
+
+  const { data: oldData } = await supabase
+    .from("work_categories")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  const { error } = await supabase.from("work_categories").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+
+  await logAudit(supabase, {
+    userId: profile.id,
+    action: "DELETE_CATEGORY",
+    module: "CATEGORY",
+    recordId: id,
+    oldData,
+  });
+
+  revalidatePath("/master/kategori");
+}
+
+export async function getCategoryUsageCount(id: string) {
+  await requireRole(["SUPERADMIN"]);
+  const supabase = await createClient();
+  const { count } = await supabase
+    .from("works")
+    .select("*", { count: "exact", head: true })
+    .eq("category_id", id);
+  return { workCount: count ?? 0 };
+}

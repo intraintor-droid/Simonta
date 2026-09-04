@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Plus, Pencil, Power, Tags } from "lucide-react";
+import { Plus, Pencil, Power, Trash2, Tags } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,6 +23,8 @@ import {
   createCategory,
   updateCategory,
   toggleCategoryActive,
+  deleteCategory,
+  getCategoryUsageCount,
 } from "@/app/(app)/master/kategori/actions";
 import type { WorkCategory } from "@/types";
 
@@ -88,6 +90,25 @@ export function CategoryTable({
     }
   }
 
+  async function onDelete(item: WorkCategory) {
+    try {
+      const usage = await getCategoryUsageCount(item.id);
+      const warning =
+        usage.workCount > 0
+          ? `Kategori ini masih dipakai oleh ${usage.workCount} pekerjaan. Data pekerjaan tersebut TIDAK akan ikut terhapus, tapi kolom kategorinya akan menjadi kosong. `
+          : "";
+      const confirmed = confirm(
+        `${warning}Hapus kategori "${item.name}" secara permanen? Tindakan ini tidak dapat dibatalkan.\n\nJika ragu, gunakan tombol nonaktifkan (ikon daya) saja.`
+      );
+      if (!confirmed) return;
+      await deleteCategory(item.id);
+      setItems((prev) => prev.filter((c) => c.id !== item.id));
+      toast.success("Kategori berhasil dihapus");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Gagal menghapus kategori");
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4">
       {canManage && (
@@ -129,8 +150,17 @@ export function CategoryTable({
                         <Button variant="ghost" size="icon" onClick={() => openEdit(c)}>
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => onToggle(c)}>
+                        <Button variant="ghost" size="icon" onClick={() => onToggle(c)} title="Aktifkan/Nonaktifkan">
                           <Power className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => onDelete(c)}
+                          title="Hapus permanen"
+                          className="text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </td>
